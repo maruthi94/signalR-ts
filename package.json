@@ -1,6 +1,6 @@
 {
   "name": "signalr-ts",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "SignalR typescript libary",
   "main": "bundles/signalr-ts.umd.js",
   "module": "./esm5/index.js",
