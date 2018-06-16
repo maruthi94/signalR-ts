@@ -12,7 +12,7 @@ import { AvailableTransports } from './transports/index';
 export const CLIENT_CONFIG_DEFAULTS = {
   url: '/signalr',
   logging: false,
-  logger: new Logdown({ prefix: 'SignalR Client' }),
+  logger: new Logdown('SignalR Client'),
   hubClient: false,
   totalTransportConnectTimeout: 10000
 };

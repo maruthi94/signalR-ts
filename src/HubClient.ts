@@ -10,7 +10,7 @@ import PromiseMaker from './PromiseMaker';
 import { each as _each } from 'lodash';
 
 export const HUB_CLIENT_CONFIG_DEFAULTS = {
-  logger: new Logdown({ prefix: 'SignalR Hub-Client' }),
+  logger: new Logdown('SignalR Hub-Client'),
   hubClient: true
 };
 /**
