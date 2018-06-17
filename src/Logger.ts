@@ -45,9 +45,12 @@ export class Logger implements ILogger {
     }
 
     if (supportingDetails.length > 0) {
-      console[msgType](`${this._name.toUpperCase}: ${msg}`, supportingDetails);
+      console[msgType](
+        `${this._name.toUpperCase()}: ${msg}`,
+        supportingDetails
+      );
     } else {
-      console[msgType](`${this._name.toUpperCase}: ${msg}`);
+      console[msgType](`${this._name.toUpperCase()}: ${msg}`);
     }
   }
 }

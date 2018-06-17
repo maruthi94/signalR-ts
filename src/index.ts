@@ -1,6 +1,7 @@
-import Client from './Client';
-import HubClient from './HubClient';
-export { TransportType } from './Utils';
+// import { HubClient } from './HubClient';
 
-export const SignalRClient = Client;
-export const SignalRHubClient = HubClient;
+// import HubClient from './HubClient';
+export * from './Utils';
+export * from './HubClient';
+
+// export const SignalRHubClient = HubClient;

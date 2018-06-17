@@ -5,7 +5,7 @@ import Client, { CLIENT_CONFIG_DEFAULTS } from './Client';
 import HubProxy from './HubProxy';
 import Protocol from './Protocol';
 import PromiseMaker from './PromiseMaker';
-import { each as _each, isString } from 'lodash';
+import { each as _each, isString, isArray } from 'lodash';
 import { IConfig } from './Utils';
 import { Logger } from './Logger';
 
@@ -18,7 +18,7 @@ export const HUB_CLIENT_CONFIG_DEFAULTS = {
  * Th' Client that be used fer Hub connections.
  * @class
  */
-export default class HubClient extends Client {
+export class HubClient extends Client {
   invocationCallbackId: number | undefined;
   invocationCallbacks: any;
   private proxies: any;
@@ -54,32 +54,40 @@ export default class HubClient extends Client {
     this.received((minData: any) => {
       if (!minData || !minData.length) {
         return;
-      }
-      _each(minData, (md) => {
-        const data = Protocol.expandClientHubInvocation(md);
-        const hubName =
-          data.Hub && isString(data.Hub) ? data.Hub.toLowerCase() : '';
-        const proxy = this.proxies[hubName];
-        if (proxy) {
-          this._logger.info(
-            `\`${data.Hub}\` proxy found, invoking \`${data.Method}\`.`
-          );
-          const func = proxy.funcs[data.Method];
-          if (func) {
-            const arrrrgs = Array.prototype.join(...data.Args, ', ');
-            this._logger.info(`Invoking \`${data.Method}(${arrrrgs})\`. `);
-            func(data.State, ...data.Args);
-          } else {
-            this._logger.warn(
-              `Client function not found for method \`${
-                data.Method
-              }\` on hub \`${data.Hub}\`.`
-            );
-          }
-        } else {
-          this._logger.error(`Proxy for ${data.Hub} not found.`);
+      } else if (minData.I !== undefined) {
+        const callback = this.invocationCallbacks[minData.I];
+        if (callback) {
+          this.invocationCallbacks[minData.I] = null;
+          delete this.invocationCallbacks[minData.I];
+          callback(minData);
         }
-      });
+      } else {
+        _each(minData, (md) => {
+          const data = Protocol.expandClientHubInvocation(md);
+          const hubName =
+            data.Hub && isString(data.Hub) ? data.Hub.toLowerCase() : '';
+          const proxy = this.proxies[hubName];
+          if (proxy) {
+            this._logger.info(
+              `\`${data.Hub}\` proxy found, invoking \`${data.Method}\`.`
+            );
+            const funcs = proxy.observers[data.Method];
+            if (funcs && isArray(funcs) && funcs.length > 0) {
+              const arrrrgs = [...data.Args].join(',');
+              this._logger.info(`Invoking \`${data.Method}(${arrrrgs})\`. `);
+              funcs.forEach((func: Function) => func(...data.Args));
+            } else {
+              this._logger.warn(
+                `Client function not found for method \`${
+                  data.Method
+                }\` on hub \`${data.Hub}\`.`
+              );
+            }
+          } else {
+            this._logger.error(`Proxy for ${data.Hub} not found.`);
+          }
+        });
+      }
     });
   }
 

@@ -100,7 +100,7 @@ export default class Client extends EventEmitter {
    * @emits error
    */
   start(options?: any) {
-    this._config = Object.assign(this._config, options);
+    this._config = Object.assign(this._config, options || {});
     if (this.state !== CLIENT_STATES.stopped) {
       this.emit(CLIENT_EVENTS.error);
       throw new Error(
