@@ -1,8 +1,7 @@
 import { isEmpty, isFunction, isUndefined, extend } from 'lodash';
-// @ts-ignore
-import Logdown from 'logdown';
 import Protocol from './Protocol';
 import EventEmitter from './EventEmitter';
+import { Logger } from './Logger';
 /**
  * A proxy that can be used to invoke methods server-side.
  * @class
@@ -21,12 +20,12 @@ export default class HubProxy extends EventEmitter {
    * @param {string} hubName The name of the hub that the user wishes to generate a proxy for.
    * @constructor
    */
-  constructor(client: any, hubName: string) {
+  constructor(client: any, hubName: string, log = false) {
     super();
     this._state = {};
     this._client = client;
     this._hubName = hubName;
-    this._logger = new Logdown(hubName);
+    this._logger = new Logger(hubName, log);
     this.funcs = {};
     this.server = {};
   }
@@ -42,8 +41,8 @@ export default class HubProxy extends EventEmitter {
     const data: any = {
       H: this._hubName,
       M: methodName,
-      A: args.map(a => (isFunction(a) || isUndefined(a) ? null : a)),
-      I: this._client.invocationCallbackId
+      A: args.map((a) => (isFunction(a) || isUndefined(a) ? null : a)),
+      I: this._client.invocationCallbackId,
     };
 
     const callback = (minResult: any) => {
@@ -65,7 +64,11 @@ export default class HubProxy extends EventEmitter {
           const error: any = new Error(result.Error);
           error.source = source;
           error.data = result.ErrorData;
-          this._logger.error(`${this._hubName}.${methodName} failed to execute. Error: ${error.message}`);
+          this._logger.error(
+            `${this._hubName}.${methodName} failed to execute. Error: ${
+              error.message
+            }`
+          );
           reject(error);
         } else {
           // Server invocation succeeded, resolve the deferred
@@ -76,7 +79,9 @@ export default class HubProxy extends EventEmitter {
       });
     };
 
-    this._client.invocationCallbacks[this._client.invocationCallbackId.toString()] = { scope: this, method: callback };
+    this._client.invocationCallbacks[
+      this._client.invocationCallbackId.toString()
+    ] = { scope: this, method: callback };
     this._client.invocationCallbackId += 1;
 
     if (!isEmpty(this._state)) {

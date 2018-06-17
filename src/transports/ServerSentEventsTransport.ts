@@ -6,16 +6,17 @@ import EventSourcePolyfill from 'eventsource';
 import request from 'superagent';
 import PromiseMaker from '../PromiseMaker';
 declare var window: any;
-const EventSource = (typeof window !== 'undefined' && window.EventSource) || EventSourcePolyfill;
+const EventSource =
+  (typeof window !== 'undefined' && window.EventSource) || EventSourcePolyfill;
 /**
  * The ServerSentEvents transport protocol.
  */
 export default class ServerSentEventsTransport extends Transport {
   static supportsKeepAlive = true;
+  public _reconnectTimeoutId: any;
   private _intentionallyClosed: any;
   private _url: string;
   private _eventSource: any;
-  private _reconnectTimeoutId: any;
 
   /**
    * Uses th' current client, treaty from th' initial negotiation, 'n target URL to construct a new ServerSentEvents transport.
@@ -24,8 +25,8 @@ export default class ServerSentEventsTransport extends Transport {
    * @param {string} url The URL of the server the client is connecting to.
    * @constructor
    */
-  constructor(client: any, treaty: any, url: string) {
-    super('serverSentEvents', client, treaty);
+  constructor(client: any, treaty: any, url: string, log = false) {
+    super('serverSentEvents', client, treaty, log);
     this._intentionallyClosed = null;
     this._url = url;
   }
@@ -45,19 +46,28 @@ export default class ServerSentEventsTransport extends Transport {
     return new Promise((resolve, reject) => {
       if (this._eventSource && this._intentionallyClosed) {
         return reject(
-          new Error('An EventSource has already been initialized. Call `stop()` before attempting to `start()` again.')
+          new Error(
+            'An EventSource has already been initialized. Call `stop()` before attempting to `start()` again.'
+          )
         );
       }
 
       this._logger.info(`*${this.constructor.name}* starting...`);
       let url = this._url;
-      if (!this._intentionallyClosed && this.state === CONNECTION_STATES.reconnecting) {
+      if (
+        !this._intentionallyClosed &&
+        this.state === CONNECTION_STATES.reconnecting
+      ) {
         this._logger.info(`Reconnecting to ${url}`);
-        url += `/reconnect?transport=serverSentEvents&connectionToken=${encodeURIComponent(this._connectionToken)}`;
+        url += `/reconnect?transport=serverSentEvents&connectionToken=${encodeURIComponent(
+          this._connectionToken
+        )}`;
         this.emit(CONNECTION_EVENTS.reconnecting);
       } else {
         this._logger.info(`Connecting to ${url}`);
-        url += `/connect?transport=serverSentEvents&connectionToken=${encodeURIComponent(this._connectionToken)}`;
+        url += `/connect?transport=serverSentEvents&connectionToken=${encodeURIComponent(
+          this._connectionToken
+        )}`;
         this.emit(CONNECTION_EVENTS.connecting);
         this.state = CONNECTION_STATES.connecting;
       }
@@ -67,7 +77,10 @@ export default class ServerSentEventsTransport extends Transport {
       this._eventSource.onopen = (e: any) => {
         if (e.type === 'open') {
           this._logger.info(`*${this.constructor.name}* connection opened.`);
-          if (!this._intentionallyClosed && this.state === CONNECTION_STATES.reconnecting) {
+          if (
+            !this._intentionallyClosed &&
+            this.state === CONNECTION_STATES.reconnecting
+          ) {
             this.emit(CONNECTION_EVENTS.reconnected);
           } else {
             this.emit(CONNECTION_EVENTS.onConnected);
@@ -83,7 +96,9 @@ export default class ServerSentEventsTransport extends Transport {
         this._processMessages(e.data);
       };
       this._eventSource.onerror = (e: any) => {
-        this._logger.error(`*${this.constructor.name}* connection errored: ${e}`);
+        this._logger.error(
+          `*${this.constructor.name}* connection errored: ${e}`
+        );
       };
     });
   }
@@ -135,7 +150,11 @@ export default class ServerSentEventsTransport extends Transport {
     this.emit(CONNECTION_EVENTS.disconnecting);
     this._intentionallyClosed = false;
     this._eventSource.close();
-    this._logger.info(`*${this.constructor.name}* connection closed unexpectedly... Attempting to reconnect.`);
+    this._logger.info(
+      `*${
+        this.constructor.name
+      }* connection closed unexpectedly... Attempting to reconnect.`
+    );
     this.state = CONNECTION_STATES.reconnecting;
     this._reconnectTimeoutId = setTimeout(this.start(), this._reconnectWindow);
   }

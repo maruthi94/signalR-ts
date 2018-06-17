@@ -1,17 +1,18 @@
 // @ts-ignore
 import request from 'superagent';
-// @ts-ignore
-import Logdown from 'logdown';
 import { CLIENT_PROTOCOL_VERSION } from './Constants';
 import Client, { CLIENT_CONFIG_DEFAULTS } from './Client';
 import HubProxy from './HubProxy';
 import Protocol from './Protocol';
 import PromiseMaker from './PromiseMaker';
-import { each as _each } from 'lodash';
+import { each as _each, isString } from 'lodash';
+import { IConfig } from './Utils';
+import { Logger } from './Logger';
 
 export const HUB_CLIENT_CONFIG_DEFAULTS = {
-  logger: new Logdown('SignalR Hub-Client'),
-  hubClient: true
+  logging: false,
+  logger: null,
+  hubClient: true,
 };
 /**
  * Th' Client that be used fer Hub connections.
@@ -20,7 +21,6 @@ export const HUB_CLIENT_CONFIG_DEFAULTS = {
 export default class HubClient extends Client {
   invocationCallbackId: number | undefined;
   invocationCallbacks: any;
-  private _Config: DefaultDictionary;
   private proxies: any;
   /**
    * Uses passed in configuration settin's to initialize th' HubClient. Attatches event handlers that handle client invocations sent from th' ship,
@@ -28,9 +28,18 @@ export default class HubClient extends Client {
    * @param {Object} options The initial options defined by the user to initialize the HubClient with.
    * @constructor
    */
-  constructor(options: any) {
+  constructor(options: IConfig) {
     super(options);
-    this._Config = Object.assign({}, CLIENT_CONFIG_DEFAULTS, HUB_CLIENT_CONFIG_DEFAULTS, options || {});
+    this._config = Object.assign(
+      {},
+      CLIENT_CONFIG_DEFAULTS,
+      HUB_CLIENT_CONFIG_DEFAULTS,
+      options || {}
+    );
+    this._config.logger =
+      this._config.logging === true
+        ? new Logger('SignalR Hub-Client', true)
+        : new Logger('SignalR Hub-Client');
     // Object to store hub proxies for this connection
     this.proxies = {};
     this.invocationCallbackId = 0;
@@ -46,18 +55,26 @@ export default class HubClient extends Client {
       if (!minData || !minData.length) {
         return;
       }
-      _each(minData, md => {
+      _each(minData, (md) => {
         const data = Protocol.expandClientHubInvocation(md);
-        const proxy = this.proxies[data.Hub];
+        const hubName =
+          data.Hub && isString(data.Hub) ? data.Hub.toLowerCase() : '';
+        const proxy = this.proxies[hubName];
         if (proxy) {
-          this._logger.info(`\`${data.Hub}\` proxy found, invoking \`${data.Method}\`.`);
+          this._logger.info(
+            `\`${data.Hub}\` proxy found, invoking \`${data.Method}\`.`
+          );
           const func = proxy.funcs[data.Method];
           if (func) {
             const arrrrgs = Array.prototype.join(...data.Args, ', ');
             this._logger.info(`Invoking \`${data.Method}(${arrrrgs})\`. `);
             func(data.State, ...data.Args);
           } else {
-            this._logger.warn(`Client function not found for method \`${data.Method}\` on hub \`${data.Hub}\`.`);
+            this._logger.warn(
+              `Client function not found for method \`${
+                data.Method
+              }\` on hub \`${data.Hub}\`.`
+            );
           }
         } else {
           this._logger.error(`Proxy for ${data.Hub} not found.`);
@@ -77,7 +94,14 @@ export default class HubClient extends Client {
     const hubNameLower = hubName.toLowerCase();
     this.connectionData.push({ name: hubName });
 
-    return this.proxies[hubNameLower] || (this.proxies[hubNameLower] = new HubProxy(this, hubNameLower));
+    return (
+      this.proxies[hubNameLower] ||
+      (this.proxies[hubNameLower] = new HubProxy(
+        this,
+        hubNameLower,
+        this._config.logging
+      ))
+    );
   }
 
   /**
@@ -87,11 +111,11 @@ export default class HubClient extends Client {
    * @function
    * @public
    */
-  start(options: any) {
+  start(options?: any) {
     return super.start(options);
     // TODO: figure out why this is needed/not needed
     // .then(() => request
-    //  .get(`${this._Config.url}/start`)
+    //  .get(`${this._config.url}/start`)
     //  .query({clientProtocol: CLIENT_PROTOCOL_VERSION})
     //  .query({connectionData: JSON.stringify(this.connectionData)})
     //  .query({connectionToken: this._transport.connectionToken})
@@ -108,7 +132,7 @@ export default class HubClient extends Client {
    */
   _negotiate() {
     return request
-      .get(`${this._Config.url}/negotiate`)
+      .get(`${this._config.url}/negotiate`)
       .query({ clientProtocol: CLIENT_PROTOCOL_VERSION })
       .query({ connectionData: JSON.stringify(this.connectionData) })
       .use(PromiseMaker)

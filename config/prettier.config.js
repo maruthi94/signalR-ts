@@ -6,10 +6,10 @@
 const config = {
   singleQuote: true,
   arrowParens: 'always',
-  semi: false,
+  semi: true,
   bracketSpacing: true,
   trailingComma: 'es5',
   printWidth: 80,
-}
+};
 
-module.exports = config
+module.exports = config;

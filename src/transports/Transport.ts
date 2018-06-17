@@ -1,9 +1,8 @@
-// @ts-ignore
-import Logdown from 'logdown';
 import Protocol from '../Protocol';
 import { CONNECTION_EVENTS, CONNECTION_STATES } from '../Constants';
 import { takeRight } from 'lodash';
 import EventEmitter from '../EventEmitter';
+import { Logger } from '../Logger';
 
 export default abstract class Transport extends EventEmitter {
   name: string;
@@ -14,7 +13,7 @@ export default abstract class Transport extends EventEmitter {
   protected _lastMessage: any;
   protected _abortRequest: boolean;
   protected _client: any;
-
+  protected _keepAliveTimeoutId: any;
   private _lastMessages: Array<any>;
   // @ts-ignore
   private _state: number;
@@ -22,7 +21,6 @@ export default abstract class Transport extends EventEmitter {
   // private _keepAliveTimeoutDisconnect: any;
   // @ts-ignore
   private supportsKeepAlive: boolean;
-  private _keepAliveTimeoutId: any;
   private _latestMessageTime: any;
   private _keepAliveData: any;
   /**
@@ -32,24 +30,25 @@ export default abstract class Transport extends EventEmitter {
    * @param {Object} treaty th' response from th' negotiate request created by th' SignalR ship
    * @constructor
    */
-  constructor(name: string, client: any, treaty: any) {
+  constructor(name: string, client: any, treaty: any, log = false) {
     super();
     this.state = CONNECTION_STATES.disconnected;
     this.name = name;
     this._client = client;
-    this._logger = new Logdown(`${this.name}`);
+    this._logger = new Logger(`${this.name}`, log);
     this._abortRequest = false;
     this._lastMessages = [];
     this._keepAliveData = {};
     this._connectionToken = treaty.ConnectionToken;
     this._connectionId = treaty.ConnectionId;
-    this._reconnectWindow = (treaty.KeepAliveTimeout + treaty.DisconnectTimeout) * 1000;
+    this._reconnectWindow =
+      (treaty.KeepAliveTimeout + treaty.DisconnectTimeout) * 1000;
     this._keepAliveData = {
       monitor: false,
       activated: !!treaty.KeepAliveTimeout,
       timeout: treaty.KeepAliveTimeout * 1000,
       timeoutWarning: treaty.KeepAliveTimeout * 1000 * (2 / 3),
-      transportNotified: false
+      transportNotified: false,
     };
   }
 
@@ -73,7 +72,10 @@ export default abstract class Transport extends EventEmitter {
     if (!this._state) {
       this._state = newState;
     } else {
-      this.emit(CONNECTION_EVENTS.stateChanging, { oldState: this.state, newState });
+      this.emit(CONNECTION_EVENTS.stateChanging, {
+        oldState: this.state,
+        newState,
+      });
       this._state = newState;
       this.emit(CONNECTION_EVENTS.stateChanged, newState);
     }
@@ -143,7 +145,10 @@ export default abstract class Transport extends EventEmitter {
     const expandedResponse = Protocol.expandResponse(compressedResponse);
     this._lastMessageAt = new Date().getTime();
     this._lastMessage = expandedResponse;
-    this._lastMessages = takeRight([...this._lastMessages, expandedResponse], 5);
+    this._lastMessages = takeRight(
+      [...this._lastMessages, expandedResponse],
+      5
+    );
     this.emit(CONNECTION_EVENTS.received, expandedResponse.messages);
   }
 
@@ -156,7 +161,10 @@ export default abstract class Transport extends EventEmitter {
    */
   set _lastMessageAt(newTimestamp) {
     if (this._supportsKeepAlive()) {
-      this._keepAliveTimeoutId = setTimeout(this._keepAliveTimeoutDisconnect, this._keepAliveData.timeout);
+      this._keepAliveTimeoutId = setTimeout(
+        this._keepAliveTimeoutDisconnect,
+        this._keepAliveData.timeout
+      );
     }
     this._latestMessageTime = newTimestamp;
   }

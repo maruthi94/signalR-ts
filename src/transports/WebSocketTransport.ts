@@ -3,11 +3,11 @@ import { CONNECTION_EVENTS, CONNECTION_STATES } from '../Constants';
 
 export default class WebSocketTransport extends Transport {
   static supportsKeepAlive = true;
+  public _reconnectTimeoutId: any;
   private _intentionallyClosed: any;
   private _url: string;
   private _socket: any;
   // private _client: any;
-  private _reconnectTimeoutId: any;
 
   /**
    * Uses th' current client, treaty from th' initial negotiation, 'n target URL to construct a new WebSocket transport.
@@ -16,8 +16,8 @@ export default class WebSocketTransport extends Transport {
    * @param {string} url The URL of the server the client is connecting to.
    * @constructor
    */
-  constructor(client: any, treaty: any, url: string) {
-    super('webSockets', client, treaty);
+  constructor(client: any, treaty: any, url: string, log = false) {
+    super('webSockets', client, treaty, log);
     this._intentionallyClosed = null;
     this._url = url;
   }
@@ -59,7 +59,9 @@ export default class WebSocketTransport extends Transport {
       }
       if (this._socket && this._intentionallyClosed) {
         return reject(
-          new Error('A socket has already been initialized. Call `stop()` before attempting to `start()` again.')
+          new Error(
+            'A socket has already been initialized. Call `stop()` before attempting to `start()` again.'
+          )
         );
       }
 
@@ -67,11 +69,18 @@ export default class WebSocketTransport extends Transport {
       let url = this._url.replace(/http(s)?:/, 'ws:');
       this._logger.info(`Connecting to ${url}`);
 
-      if (!this._intentionallyClosed && this.state === CONNECTION_STATES.reconnecting) {
-        url += `/reconnect?transport=webSockets&connectionToken=${encodeURIComponent(this._connectionToken)}`;
+      if (
+        !this._intentionallyClosed &&
+        this.state === CONNECTION_STATES.reconnecting
+      ) {
+        url += `/reconnect?transport=webSockets&connectionToken=${encodeURIComponent(
+          this._connectionToken
+        )}`;
         this.emit(CONNECTION_EVENTS.reconnecting);
       } else {
-        url += `/connect?transport=webSockets&connectionToken=${encodeURIComponent(this._connectionToken)}`;
+        url += `/connect?transport=webSockets&connectionToken=${encodeURIComponent(
+          this._connectionToken
+        )}`;
         this.emit(CONNECTION_EVENTS.connecting);
         this.state = CONNECTION_STATES.connecting;
       }
@@ -83,7 +92,10 @@ export default class WebSocketTransport extends Transport {
       this._socket.onopen = (e: any) => {
         if (e.type === 'open') {
           this._logger.info(`*${this.constructor.name}* connection opened.`);
-          if (!this._intentionallyClosed && this.state === CONNECTION_STATES.reconnecting) {
+          if (
+            !this._intentionallyClosed &&
+            this.state === CONNECTION_STATES.reconnecting
+          ) {
             this.emit(CONNECTION_EVENTS.reconnected);
           } else {
             this.emit(CONNECTION_EVENTS.onConnected);
@@ -96,7 +108,9 @@ export default class WebSocketTransport extends Transport {
         this._processMessages(e.data);
       };
       this._socket.onerror = (e: any) => {
-        this._logger.error(`*${this.constructor.name}* connection errored: ${e}`);
+        this._logger.error(
+          `*${this.constructor.name}* connection errored: ${e}`
+        );
       };
       this._socket.onclose = () => {
         if (this._intentionallyClosed) {
@@ -104,9 +118,16 @@ export default class WebSocketTransport extends Transport {
           this.state = CONNECTION_STATES.disconnected;
           this.emit(CONNECTION_EVENTS.disconnected);
         } else {
-          this._logger.info(`*${this.constructor.name}* connection closed unexpectedly... Attempting to reconnect.`);
+          this._logger.info(
+            `*${
+              this.constructor.name
+            }* connection closed unexpectedly... Attempting to reconnect.`
+          );
           this.state = CONNECTION_STATES.reconnecting;
-          this._reconnectTimeoutId = setTimeout(this.start(), this._reconnectWindow);
+          this._reconnectTimeoutId = setTimeout(
+            this.start(),
+            this._reconnectWindow
+          );
         }
       };
     });

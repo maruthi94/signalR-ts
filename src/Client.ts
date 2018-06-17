@@ -1,22 +1,30 @@
 import async from 'async';
-// @ts-ignore
-import Logdown from 'logdown';
+
 // @ts-ignore
 import request from 'superagent';
 import PromiseMaker from './PromiseMaker';
 import EventEmitter from './EventEmitter';
 import ConnectingMessageBuffer from './ConnectingMessageBuffer';
-import { CLIENT_STATES, CLIENT_EVENTS, CONNECTION_EVENTS, CLIENT_PROTOCOL_VERSION } from './Constants';
+import {
+  CLIENT_STATES,
+  CLIENT_EVENTS,
+  CONNECTION_EVENTS,
+  CLIENT_PROTOCOL_VERSION,
+} from './Constants';
 import { AvailableTransports } from './transports/index';
+import { IConfig } from './Utils';
+import { Logger } from './Logger';
 
 export const CLIENT_CONFIG_DEFAULTS = {
   url: '/signalr',
   logging: false,
-  logger: new Logdown('SignalR Client'),
   hubClient: false,
-  totalTransportConnectTimeout: 10000
+  logger: null,
+  totalTransportConnectTimeout: 10000,
 };
-
+class DefaultDictionary {
+  [propName: string]: any;
+}
 /**
  * The public API for managing communications with a SignalR server
  * @class
@@ -25,7 +33,7 @@ export const CLIENT_CONFIG_DEFAULTS = {
 export default class Client extends EventEmitter {
   connectionData: Array<any>;
   protected _logger: any;
-  private _config: DefaultDictionary;
+  protected _config: DefaultDictionary;
   private _transport: any;
   private _connectingMessageBuffer: ConnectingMessageBuffer;
   private _state: any;
@@ -36,12 +44,19 @@ export default class Client extends EventEmitter {
    * @constructs
    * @returns {Client} Returns a new client object.
    */
-  constructor(options: any) {
+  constructor(options: IConfig) {
     super();
     this._config = Object.assign({}, CLIENT_CONFIG_DEFAULTS, options || {});
+    this._config.logger =
+      this._config.logging === true
+        ? new Logger('SignalR Client', true)
+        : new Logger('SignalR Client');
     this._logger = this._config.logger;
     this.state = CLIENT_STATES.stopped;
-    this._connectingMessageBuffer = new ConnectingMessageBuffer(this, this.emit.bind(this, CLIENT_EVENTS.received));
+    this._connectingMessageBuffer = new ConnectingMessageBuffer(
+      this,
+      this.emit.bind(this, CLIENT_EVENTS.received)
+    );
     this.connectionData = [];
   }
 
@@ -57,7 +72,10 @@ export default class Client extends EventEmitter {
     if (!this._state) {
       this._state = newState;
     } else {
-      this.emit(CLIENT_EVENTS.stateChanging, { oldState: this.state, newState });
+      this.emit(CLIENT_EVENTS.stateChanging, {
+        oldState: this.state,
+        newState,
+      });
       this._state = newState;
       this.emit(CLIENT_EVENTS.stateChanged, newState);
     }
@@ -81,7 +99,7 @@ export default class Client extends EventEmitter {
    * @emits started
    * @emits error
    */
-  start(options: any) {
+  start(options?: any) {
     this._config = Object.assign(this._config, options);
     if (this.state !== CLIENT_STATES.stopped) {
       this.emit(CLIENT_EVENTS.error);
@@ -356,10 +374,17 @@ export default class Client extends EventEmitter {
     return new Promise((resolve, reject) => {
       const availableTransports = AvailableTransports();
       if (this._config.transport && this._config.transport !== 'auto') {
-        const transportConstructor: any = availableTransports.filter(x => x.name === this._config.transport)[0];
+        const transportConstructor: any = availableTransports.filter(
+          (x) => x.name === this._config.transport
+        )[0];
         if (transportConstructor) {
           // If the transport specified in the config is found in the available transports, use it
-          const transport = new transportConstructor(this, treaty, this._config.url);
+          const transport = new transportConstructor(
+            this,
+            treaty,
+            this._config.url,
+            this._config.logging
+          );
           transport.start().then(() => resolve(transport));
         } else {
           reject(
@@ -367,7 +392,7 @@ export default class Client extends EventEmitter {
               `The transport specified (${
                 this._config.transport
               }) was not found among the available transports [${availableTransports
-                .map(x => `'${x.name}'`)
+                .map((x) => `'${x.name}'`)
                 .join(' ')}].`
             )
           );
@@ -376,13 +401,19 @@ export default class Client extends EventEmitter {
         // Otherwise, Auto Negotiate the transport
         this._logger.info(`Negotiating the transport...`);
         async.detectSeries(
-          availableTransports.map((x: any) => new x(this, treaty, this._config.url)),
+          availableTransports.map(
+            (x: any) =>
+              new x(this, treaty, this._config.url, this._config.logging)
+          ),
           (t, c) =>
             t
               .start()
               .then(() => c(t))
               .catch(() => c()),
-          transport => (transport ? resolve(transport) : reject('No suitable transport was found.'))
+          (transport) =>
+            transport
+              ? resolve(transport)
+              : reject('No suitable transport was found.')
         );
       }
     });

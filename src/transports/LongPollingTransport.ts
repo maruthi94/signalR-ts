@@ -1,4 +1,4 @@
-import _, { NumericDictionary } from 'lodash';
+import _ from 'lodash';
 // @ts-ignore
 import request from 'superagent';
 import Transport from './Transport';
@@ -27,8 +27,8 @@ export default class LongPollingTransport extends Transport {
    * @param {string} url The URL of the server the user wishes to connect to.
    * @constructor
    */
-  constructor(client: any, treaty: any, url: string) {
-    super('longPolling', client, treaty);
+  constructor(client: any, treaty: any, url: string, log = false) {
+    super('longPolling', client, treaty, log);
     this._maxReconnectedTimeout = 3600000;
     this._url = url;
   }
@@ -129,7 +129,10 @@ export default class LongPollingTransport extends Transport {
         if (err && shouldReconnect) {
           return (this._reconnectTimeoutId = setTimeout(
             this._reconnect().then(this._poll.bind(this)),
-            Math.min(1000 * (Math.pow(2, this._reconnectTries) - 1), this._maxReconnectedTimeout)
+            Math.min(
+              1000 * (Math.pow(2, this._reconnectTries) - 1),
+              this._maxReconnectedTimeout
+            )
           ));
         }
         if (res) {
@@ -185,7 +188,10 @@ export default class LongPollingTransport extends Transport {
     this._current = request.post(url);
     this._current = this._queryData(this._current);
 
-    if (Math.min(1000 * (Math.pow(2, this._reconnectTries) - 1)) >= this._maxReconnectedTimeout) {
+    if (
+      Math.min(1000 * (Math.pow(2, this._reconnectTries) - 1)) >=
+      this._maxReconnectedTimeout
+    ) {
       this.stop();
     }
 
