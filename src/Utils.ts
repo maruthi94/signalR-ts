@@ -1,6 +1,6 @@
 // type TransportType = 'WebSocketTransport'|'ServerSentEventsTransport'|'LongPollingTransport'|'NullTransport';
 
-export enum TransportType {
+export const enum TransportType {
   WebSocketTransport = 'WebSocketTransport',
   ServerSentEventsTransport = 'ServerSentEventsTransport',
   LongPollingTransport = 'LongPollingTransport',
@@ -8,6 +8,6 @@ export enum TransportType {
 }
 export interface IConfig {
   url: string;
-  transport: TransportType;
-  logging: boolean;
+  transport?: string;
+  logging?: boolean;
 }
