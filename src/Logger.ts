@@ -6,6 +6,14 @@ interface ILogger {
   warn(primaryMessage: string, ...supportingData: any[]): void;
 }
 
+enum LogLevel {
+  Debug = 'debug',
+  Info = 'info',
+  Log = 'log',
+  Warn = 'warn',
+  Error = 'error',
+}
+
 type LogType = 'log' | 'debug' | 'error' | 'warn' | 'info';
 
 export class Logger implements ILogger {
@@ -16,19 +24,19 @@ export class Logger implements ILogger {
     this._enabled = enabled;
   }
   log(primaryMessage: string, ...supportingData: any[]): void {
-    throw new Error('Method not implemented.');
+    this.emitMessage(LogLevel.Log, primaryMessage, supportingData);
   }
   debug(primaryMessage: string, ...supportingData: any[]): void {
-    throw new Error('Method not implemented.');
+    this.emitMessage(LogLevel.Debug, primaryMessage, supportingData);
   }
   error(primaryMessage: string, ...supportingData: any[]): void {
-    throw new Error('Method not implemented.');
+    this.emitMessage(LogLevel.Error, primaryMessage, supportingData);
   }
   info(primaryMessage: string, ...supportingData: any[]): void {
-    throw new Error('Method not implemented.');
+    this.emitMessage(LogLevel.Info, primaryMessage, supportingData);
   }
   warn(primaryMessage: string, ...supportingData: any[]): void {
-    throw new Error('Method not implemented.');
+    this.emitMessage(LogLevel.Warn, primaryMessage, supportingData);
   }
 
   emitMessage(msgType: LogType, msg: string, supportingDetails: any[]) {
