@@ -59,7 +59,7 @@
     "hooks": {
       "commit-msg": "validate-commit-msg",
       "pre-commit": "lint-staged",
-      "pre-push": "npm run style && npm test -- --bail --onlyChanged"
+      "pre-push1": "npm run style && npm test -- --bail --onlyChanged"
     }
   },
   "lint-staged": {
