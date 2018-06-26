@@ -1,13 +1,11 @@
 import Transport from './Transport';
 import { CONNECTION_EVENTS, CONNECTION_STATES } from '../Constants';
 // @ts-ignore
-import EventSourcePolyfill from 'eventsource';
+// import EventSourcePolyfill from 'eventsource';
 // @ts-ignore
 import request from 'superagent';
 import PromiseMaker from '../PromiseMaker';
-declare var window: any;
-const EventSource =
-  (typeof window !== 'undefined' && window.EventSource) || EventSourcePolyfill;
+// const EventSource = (typeof window !== 'undefined' && window.EventSource) || EventSourcePolyfill;
 /**
  * The ServerSentEvents transport protocol.
  */
@@ -42,7 +40,7 @@ export default class ServerSentEventsTransport extends Transport {
    * @emits connected
    * @emits reconnected
    */
-  start() {
+  start(): Promise<any> {
     return new Promise((resolve, reject) => {
       if (this._eventSource && this._intentionallyClosed) {
         return reject(
@@ -70,6 +68,11 @@ export default class ServerSentEventsTransport extends Transport {
         )}`;
         this.emit(CONNECTION_EVENTS.connecting);
         this.state = CONNECTION_STATES.connecting;
+      }
+      if (this._client.connectionData) {
+        url += `&connectionData=${encodeURIComponent(
+          JSON.stringify(this._client.connectionData)
+        )}`;
       }
       url += '&tid=' + Math.floor(Math.random() * 11);
 
@@ -138,7 +141,8 @@ export default class ServerSentEventsTransport extends Transport {
       .send(`data=${JSON.stringify(data)}`)
       .set('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8')
       .use(PromiseMaker)
-      .promise();
+      .promise()
+      .then(this._processMessages.bind(this));
   }
   /**
    * If th' keepAlive times out, closes th' connection cleanly 'n attempts to reconnect.

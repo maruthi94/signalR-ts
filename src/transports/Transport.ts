@@ -1,8 +1,9 @@
 import Protocol from '../Protocol';
 import { CONNECTION_EVENTS, CONNECTION_STATES } from '../Constants';
-import { takeRight } from 'lodash';
+// import { takeRight } from 'lodash';
 import EventEmitter from '../EventEmitter';
 import { Logger } from '../Logger';
+import { isUndefined } from '../Helper';
 
 export default abstract class Transport extends EventEmitter {
   name: string;
@@ -142,14 +143,18 @@ export default abstract class Transport extends EventEmitter {
    */
   _processMessages(compressedResponse: any) {
     this.emit(CONNECTION_EVENTS.receiving, compressedResponse);
-    const expandedResponse = Protocol.expandResponse(compressedResponse);
-    this._lastMessageAt = new Date().getTime();
-    this._lastMessage = expandedResponse;
-    this._lastMessages = takeRight(
-      [...this._lastMessages, expandedResponse],
-      5
-    );
-    this.emit(CONNECTION_EVENTS.received, expandedResponse.messages);
+    if (!isUndefined(compressedResponse.I)) {
+      this.emit(CONNECTION_EVENTS.received, compressedResponse);
+    } else {
+      const expandedResponse = Protocol.expandResponse(compressedResponse);
+      this._lastMessageAt = new Date().getTime();
+      this._lastMessage = expandedResponse;
+      this._lastMessages = [...this._lastMessages, expandedResponse].slice(
+        0,
+        5
+      );
+      this.emit(CONNECTION_EVENTS.received, expandedResponse.messages);
+    }
   }
 
   /**

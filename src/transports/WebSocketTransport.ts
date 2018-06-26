@@ -52,7 +52,7 @@ export default class WebSocketTransport extends Transport {
    * @emits disconnected
    * @extends start
    */
-  start() {
+  start(): Promise<any> {
     return new Promise((resolve, reject) => {
       if (!WebSocket) {
         return reject(new Error('The type `WebSocket` could not be resolved.'));
@@ -85,7 +85,9 @@ export default class WebSocketTransport extends Transport {
         this.state = CONNECTION_STATES.connecting;
       }
       if (this._client.connectionData) {
-        url += `&connectionData=${JSON.stringify(this._client.connectionData)}`;
+        url += `&connectionData=${encodeURIComponent(
+          JSON.stringify(this._client.connectionData)
+        )}`;
       }
       url += '&tid=' + Math.floor(Math.random() * 11);
       this._socket = new WebSocket(url);
@@ -105,7 +107,7 @@ export default class WebSocketTransport extends Transport {
         }
       };
       this._socket.onmessage = (e: any) => {
-        this._processMessages(e.data);
+        this._processMessages(JSON.parse(e.data));
       };
       this._socket.onerror = (e: any) => {
         this._logger.error(

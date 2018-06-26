@@ -1,13 +1,9 @@
-// @ts-ignore
-import request from 'superagent';
-import { CLIENT_PROTOCOL_VERSION } from './Constants';
 import Client, { CLIENT_CONFIG_DEFAULTS } from './Client';
 import HubProxy from './HubProxy';
 import Protocol from './Protocol';
-import PromiseMaker from './PromiseMaker';
-import { each as _each, isString, isArray } from 'lodash';
 import { IConfig } from './Utils';
 import { Logger } from './Logger';
+import { isString, isUndefined } from './Helper';
 
 export const HUB_CLIENT_CONFIG_DEFAULTS = {
   logging: false,
@@ -19,8 +15,8 @@ export const HUB_CLIENT_CONFIG_DEFAULTS = {
  * @class
  */
 export class HubClient extends Client {
-  invocationCallbackId: number | undefined;
-  invocationCallbacks: any;
+  protected invocationCallbackId: any;
+  protected invocationCallbacks: any;
   private proxies: any;
   /**
    * Uses passed in configuration settin's to initialize th' HubClient. Attatches event handlers that handle client invocations sent from th' ship,
@@ -51,46 +47,10 @@ export class HubClient extends Client {
       // this._registerHubProxies();
     });
 
-    this.received((minData: any) => {
-      if (!minData || !minData.length) {
-        return;
-      } else if (minData.I !== undefined) {
-        const callback = this.invocationCallbacks[minData.I];
-        if (callback) {
-          this.invocationCallbacks[minData.I] = null;
-          delete this.invocationCallbacks[minData.I];
-          callback(minData);
-        }
-      } else {
-        _each(minData, (md) => {
-          const data = Protocol.expandClientHubInvocation(md);
-          const hubName =
-            data.Hub && isString(data.Hub) ? data.Hub.toLowerCase() : '';
-          const proxy = this.proxies[hubName];
-          if (proxy) {
-            this._logger.info(
-              `\`${data.Hub}\` proxy found, invoking \`${data.Method}\`.`
-            );
-            const funcs = proxy.observers[data.Method];
-            if (funcs && isArray(funcs) && funcs.length > 0) {
-              const arrrrgs = [...data.Args].join(',');
-              this._logger.info(`Invoking \`${data.Method}(${arrrrgs})\`. `);
-              funcs.forEach((func: Function) => func(...data.Args));
-            } else {
-              this._logger.warn(
-                `Client function not found for method \`${
-                  data.Method
-                }\` on hub \`${data.Hub}\`.`
-              );
-            }
-          } else {
-            this._logger.error(`Proxy for ${data.Hub} not found.`);
-          }
-        });
-      }
-    });
+    this.received(this.receiveHandler.bind(this));
   }
 
+  //#region public Methods
   /**
    * Creates a new hub proxy based on th' actual hub moniker.
    * @param {string} hubName The name of the hub that the proxy will be created for.
@@ -98,7 +58,7 @@ export class HubClient extends Client {
    * @function
    * @public
    */
-  createHubProxy(hubName: string) {
+  createHubProxy(hubName: string): HubProxy {
     const hubNameLower = hubName.toLowerCase();
     this.connectionData.push({ name: hubName });
 
@@ -121,29 +81,53 @@ export class HubClient extends Client {
    */
   start(options?: any) {
     return super.start(options);
-    // TODO: figure out why this is needed/not needed
-    // .then(() => request
-    //  .get(`${this._config.url}/start`)
-    //  .query({clientProtocol: CLIENT_PROTOCOL_VERSION})
-    //  .query({connectionData: JSON.stringify(this.connectionData)})
-    //  .query({connectionToken: this._transport.connectionToken})
-    //  .query({transport: this._transport.name})
-    //  .use(PromiseMaker)
-    //  .promise());
   }
 
-  /**
-   * Overridden negotiate method that adds connectionData to th' initial query. ConnectionData holds th' names 'o th' current connected hubs.
-   * @returns {Promise} Returns the
-   * @private
-   * @function
-   */
-  _negotiate() {
-    return request
-      .get(`${this._config.url}/negotiate`)
-      .query({ clientProtocol: CLIENT_PROTOCOL_VERSION })
-      .query({ connectionData: JSON.stringify(this.connectionData) })
-      .use(PromiseMaker)
-      .promise();
+  //#endregion
+
+  // #region private Methods
+  private receiveHandler(minData: any) {
+    if (!minData) {
+      return;
+    }
+    if (!isUndefined(minData.I)) {
+      const callback = this.invocationCallbacks[minData.I];
+      if (callback) {
+        this.invocationCallbacks[minData.I] = null;
+        delete this.invocationCallbacks[minData.I];
+        callback.method.call(callback.scope, minData);
+      }
+    } else {
+      if (!minData.length) {
+        return;
+      }
+      Array.isArray(minData) &&
+        minData.forEach((md) => {
+          const data = Protocol.expandClientHubInvocation(md);
+          const hubName =
+            data.Hub && isString(data.Hub) ? data.Hub.toLowerCase() : '';
+          const proxy = this.proxies[hubName];
+          if (proxy) {
+            this._logger.info(
+              `\`${data.Hub}\` proxy found, invoking \`${data.Method}\`.`
+            );
+            const funcs = proxy.observers[data.Method];
+            if (funcs && Array.isArray(funcs) && funcs.length > 0) {
+              const arrrrgs = [...data.Args].join(',');
+              this._logger.info(`Invoking \`${data.Method}(${arrrrgs})\`. `);
+              funcs.forEach((func: Function) => func(...data.Args));
+            } else {
+              this._logger.warn(
+                `Client function not found for method \`${
+                  data.Method
+                }\` on hub \`${data.Hub}\`.`
+              );
+            }
+          } else {
+            this._logger.error(`Proxy for ${data.Hub} not found.`);
+          }
+        });
+    }
   }
+  // #endregion
 }

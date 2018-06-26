@@ -1,4 +1,4 @@
-import { isString, isUndefined } from 'lodash';
+import { isString, isUndefined } from './Helper';
 /**
  * A utility tavern that contains methods fer decompressin'/compressin' incomin' 'n outgoin' messages.
  * @class
@@ -18,7 +18,7 @@ export default class Protocol {
       Hub: compressedClientHubInvocation.H,
       Method: compressedClientHubInvocation.M,
       Args: compressedClientHubInvocation.A,
-      State: compressedClientHubInvocation.S
+      State: compressedClientHubInvocation.S,
     };
   }
 
@@ -36,13 +36,13 @@ export default class Protocol {
       Result: compressedServerHubResponse.R,
       Progress: compressedServerHubResponse.P && {
         Id: compressedServerHubResponse.P.I,
-        Data: compressedServerHubResponse.P.D
+        Data: compressedServerHubResponse.P.D,
       },
       Id: compressedServerHubResponse.I,
       IsHubException: compressedServerHubResponse.H,
       Error: compressedServerHubResponse.E,
       StackTrace: compressedServerHubResponse.T,
-      ErrorData: compressedServerHubResponse.D
+      ErrorData: compressedServerHubResponse.D,
     };
   }
 
@@ -65,7 +65,7 @@ export default class Protocol {
       initialized: !isUndefined(min.S),
       shouldReconnect: !isUndefined(min.T),
       longPollDelay: min.L,
-      groupsToken: min.G
+      groupsToken: min.G,
     };
   }
 }

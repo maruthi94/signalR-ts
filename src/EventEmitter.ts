@@ -1,4 +1,4 @@
-import { sum, map as _map } from 'lodash';
+import { mapObj, sumOfArr, EventObservers } from './Helper';
 
 export default class EventEmitter {
   private observers: EventObservers;
@@ -14,7 +14,7 @@ export default class EventEmitter {
    * @public
    * @returns {void} Method does not return a value.
    */
-  on(event: string, listener: any) {
+  public on(event: string, listener: any) {
     this.observers[event] = this.observers[event] || [];
     this.observers[event].push(listener);
   }
@@ -27,7 +27,7 @@ export default class EventEmitter {
    * @public
    * @returns {void} Method does not return a value.
    */
-  off(event: string, listener: any) {
+  public off(event: string, listener: any) {
     if (!this.observers[event]) {
       return;
     }
@@ -51,7 +51,7 @@ export default class EventEmitter {
    * @public
    * @returns {void} Returns if there is no current observers for the passed in event.
    */
-  emit(event: any, ...args: Array<any>) {
+  protected emit(event: any, ...args: Array<any>) {
     if (!this.observers[event]) {
       return;
     }
@@ -65,15 +65,11 @@ export default class EventEmitter {
    * @function
    * @public
    */
-  numberOfObservers() {
-    if (_map(this.observers).map(x => x.length).length === 0) {
+  protected numberOfObservers(): number {
+    if (mapObj(this.observers).map((x) => x.length).length === 0) {
       return 0;
     } else {
-      return sum(_map(this.observers).map(x => x.length));
+      return sumOfArr(mapObj(this.observers).map((x) => x.length));
     }
   }
-}
-
-interface EventObservers {
-  [propName: string]: any;
 }

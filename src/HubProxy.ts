@@ -1,14 +1,14 @@
-import { isEmpty, isFunction, isUndefined, extend } from 'lodash';
 import Protocol from './Protocol';
 import EventEmitter from './EventEmitter';
 import { Logger } from './Logger';
+import { isFunction, isUndefined } from './Helper';
 /**
  * A proxy that can be used to invoke methods server-side.
  * @class
  */
 export default class HubProxy extends EventEmitter {
-  funcs: any;
-  server: any;
+  // funcs: any;
+  // server: any;
   private _state: any;
   private _client: any;
   private _hubName: string;
@@ -26,8 +26,8 @@ export default class HubProxy extends EventEmitter {
     this._client = client;
     this._hubName = hubName;
     this._logger = new Logger(hubName, log);
-    this.funcs = {};
-    this.server = {};
+    // this.funcs = {};
+    // this.server = {};
   }
 
   /**
@@ -37,7 +37,7 @@ export default class HubProxy extends EventEmitter {
    * @returns {*} The return statement invokes the send method, which sends the information the server needs to invoke the correct method.
    * @function
    */
-  invoke(methodName: string, ...args: Array<any>) {
+  invoke(methodName: string, ...args: Array<any>): Promise<any> {
     const data: any = {
       H: this._hubName,
       M: methodName,
@@ -45,12 +45,12 @@ export default class HubProxy extends EventEmitter {
       I: this._client.invocationCallbackId,
     };
 
-    const callback = (minResult: any) => {
-      return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
+      const callback = (minResult: any) => {
         const result = Protocol.expandServerHubResponse(minResult);
 
         // Update the hub state
-        extend(this._state, result.State);
+        this._state = Object.assign({}, this._state, result.State || {});
 
         if (result.Progress) {
           // TODO: Progress in promises?
@@ -73,23 +73,29 @@ export default class HubProxy extends EventEmitter {
         } else {
           // Server invocation succeeded, resolve the deferred
           this._logger.info(`Invoked ${this._hubName}\.${methodName}`);
-
-          return resolve(result.Result);
+          if (result.Result) {
+            resolve(result.Result);
+          } else {
+            resolve();
+          }
         }
-      });
-    };
+      };
 
-    this._client.invocationCallbacks[
-      this._client.invocationCallbackId.toString()
-    ] = { scope: this, method: callback };
-    this._client.invocationCallbackId += 1;
+      this._client.invocationCallbacks[
+        this._client.invocationCallbackId.toString()
+      ] = {
+        scope: this,
+        method: callback,
+      };
+      this._client.invocationCallbackId += 1;
 
-    if (!isEmpty(this._state)) {
-      data.S = this._state;
-    }
+      if (this._state !== {}) {
+        data.S = this._state;
+      }
 
-    this._logger.info(`Invoking ${this._hubName}\.${methodName}`);
+      this._logger.info(`Invoking ${this._hubName}\.${methodName}`);
 
-    return this._client.send(data);
+      this._client.send(data);
+    });
   }
 }

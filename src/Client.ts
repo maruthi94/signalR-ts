@@ -1,5 +1,5 @@
-import async from 'async';
-
+// @ts-ignore
+import detectSeries from 'async.detectseries';
 // @ts-ignore
 import request from 'superagent';
 import PromiseMaker from './PromiseMaker';
@@ -12,8 +12,9 @@ import {
   CLIENT_PROTOCOL_VERSION,
 } from './Constants';
 import { AvailableTransports } from './transports/index';
-import { IConfig } from './Utils';
+import { IConfig, TransportType } from './Utils';
 import { Logger } from './Logger';
+import { INegotiationResponse } from './Helper';
 
 export const CLIENT_CONFIG_DEFAULTS = {
   url: '/signalr',
@@ -31,12 +32,14 @@ class DefaultDictionary {
  * @public
  */
 export default class Client extends EventEmitter {
-  connectionData: Array<any>;
+  protected connectionData: Array<any>;
+  protected connectionId: string;
   protected _logger: any;
   protected _config: DefaultDictionary;
   private _transport: any;
   private _connectingMessageBuffer: ConnectingMessageBuffer;
   private _state: any;
+  // private _nagotiationResponse: INegotiationResponse | null;
   /**
    * Initializes th' client object wit' userdefined options. Options can include a multitude 'o properties, includin' th' ship URL,
    * a set transport protocol th' user wishes to use, a hub client, th' timeout to use when connection, 'n loggin' mechanisms.
@@ -58,6 +61,8 @@ export default class Client extends EventEmitter {
       this.emit.bind(this, CLIENT_EVENTS.received)
     );
     this.connectionData = [];
+    // this._nagotiationResponse = null;
+    this.connectionId = '';
   }
 
   /**
@@ -110,8 +115,8 @@ export default class Client extends EventEmitter {
     this.emit(CLIENT_EVENTS.starting);
     this.state = CLIENT_STATES.starting;
 
-    return this._negotiate()
-      .then(this._findTransport.bind(this))
+    return this.negotiate()
+      .then(this.findTransport.bind(this))
       .then((transport: any) => {
         this._logger.info(`Using the *${transport.constructor.name}*.`);
         this._transport = transport;
@@ -119,7 +124,7 @@ export default class Client extends EventEmitter {
         this.state = CLIENT_STATES.started;
         this._connectingMessageBuffer.drain();
 
-        return this;
+        return this.connectionId;
       });
   }
 
@@ -354,7 +359,7 @@ export default class Client extends EventEmitter {
    * @protected
    * @function
    */
-  _negotiate() {
+  private negotiate() {
     return request
       .get(`${this._config.url}/negotiate`)
       .query({ clientProtocol: CLIENT_PROTOCOL_VERSION })
@@ -363,14 +368,17 @@ export default class Client extends EventEmitter {
   }
 
   /**
-   * Takes a treaty (result 'o _negotiate()) 'n uses that 'n th' client configuration to find th' best transport protocol to use.
+   * Takes a treaty (result 'o negotiate()) 'n uses that 'n th' client configuration to find th' best transport protocol to use.
    * A user may specify a transport as well if they would like to not use th' automated selection 'o one.
    * @param {Object} treaty The result of the initial negotiation with the server.
    * @returns {Promise} A promise that will automatically find the best connection type, or to use the one defined by the user.
    * @function
    * @private
    */
-  _findTransport(treaty: any) {
+  private findTransport(treaty: INegotiationResponse) {
+    // this._nagotiationResponse = treaty;
+    this.connectionId = treaty.ConnectionId;
+
     return new Promise((resolve, reject) => {
       const availableTransports = AvailableTransports();
       if (this._config.transport && this._config.transport !== 'auto') {
@@ -399,23 +407,54 @@ export default class Client extends EventEmitter {
         }
       } else {
         // Otherwise, Auto Negotiate the transport
-        this._logger.info(`Negotiating the transport...`);
-        async.detectSeries(
-          availableTransports.map(
-            (x: any) =>
-              new x(this, treaty, this._config.url, this._config.logging)
-          ),
-          (t, c) =>
-            t
-              .start()
-              .then(() => c(t))
-              .catch(() => c()),
-          (transport) =>
+        if (treaty.TryWebSockets) {
+          const transportCtor: any = availableTransports.filter(
+            (x) => x.name === TransportType.WebSocketTransport
+          )[0];
+          if (transportCtor) {
+            const transport = new transportCtor(
+              this,
+              treaty,
+              this._config.url,
+              this._config.logging
+            );
             transport
-              ? resolve(transport)
-              : reject('No suitable transport was found.')
-        );
+              .start()
+              .then(() => resolve(transport))
+              .catch(() => reject('Error While Trying WebSocket Transport'));
+          }
+        } else {
+          this._logger.info(`Negotiating the transport...`);
+          detectSeries(
+            availableTransports
+              .filter((x) => x.name !== TransportType.WebSocketTransport)
+              .map(
+                (x: any) =>
+                  new x(this, treaty, this._config.url, this._config.logging)
+              ),
+            (t: any, c: any) =>
+              t
+                .start()
+                .then(() => c(t))
+                .catch(() => c()),
+            (transport: any) =>
+              transport
+                ? resolve(transport)
+                : reject('No suitable transport was found.')
+          );
+        }
       }
     });
   }
+
+  // private initReceived() {
+  //   return request
+  //     .get(`${this._config.url}/start`)
+  //     .query({ transport: TransportNameMap[this._transport.constructor.name] })
+  //     .query({ clientProtocol: CLIENT_PROTOCOL_VERSION })
+  //     .query({ connectionToken: this._nagotiationResponse && this._nagotiationResponse.ConnectionToken })
+  //     .query({ connectionData: this.connectionData || '' })
+  //     .use(PromiseMaker)
+  //     .promise();
+  // }
 }

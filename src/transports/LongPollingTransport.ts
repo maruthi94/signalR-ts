@@ -1,9 +1,9 @@
-import _ from 'lodash';
 // @ts-ignore
 import request from 'superagent';
 import Transport from './Transport';
 import PromiseMaker from '../PromiseMaker';
 import { CONNECTION_STATES, CONNECTION_EVENTS } from '../Constants';
+import { isString } from '../Helper';
 
 /**
  * Th' long pollin' transport protocol.
@@ -11,7 +11,6 @@ import { CONNECTION_STATES, CONNECTION_EVENTS } from '../Constants';
  */
 export default class LongPollingTransport extends Transport {
   static supportsKeepAlive = false;
-  _data: any;
   private _current: any;
   private _reconnectTries = 0;
   private _reconnectTimeoutId: number | undefined = undefined;
@@ -45,7 +44,7 @@ export default class LongPollingTransport extends Transport {
       .query({ clientProtocol: 1.5 })
       .query({ connectionToken: this._connectionToken })
       .query({ transport: 'longPolling' })
-      .query({ connectionData: this._data || '' });
+      .query({ connectionData: this._client.connectionData || '' });
   }
 
   /**
@@ -56,7 +55,7 @@ export default class LongPollingTransport extends Transport {
    * @extends start
    * @emits connected
    */
-  start() {
+  start(): Promise<any> {
     if (this._pollTimeoutId) {
       throw new Error(
         'A polling session has already been initialized. Call `stop()` before attempting to `start()` again.'
@@ -141,7 +140,7 @@ export default class LongPollingTransport extends Transport {
             this.emit(CONNECTION_EVENTS.reconnected);
             this._reconnectTries = 0;
           }
-          if (!_.isString(res.body)) {
+          if (!isString(res.body)) {
             this._processMessages(res.body);
           }
         }
@@ -169,7 +168,8 @@ export default class LongPollingTransport extends Transport {
       .send(`data=${JSON.stringify(data)}`)
       .set('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8')
       .use(PromiseMaker)
-      .promise();
+      .promise()
+      .then(this._processMessages.bind(this));
   }
 
   /**

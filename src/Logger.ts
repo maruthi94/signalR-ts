@@ -50,7 +50,7 @@ export class Logger implements ILogger {
         supportingDetails
       );
     } else {
-      console[msgType](`${this._name.toUpperCase()}: ${msg}`);
+      console[msgType](`[${this._name.toUpperCase()}]: ${msg}`);
     }
   }
 }
